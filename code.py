@@ -10,6 +10,7 @@ import displayio
 import terminalio
 from adafruit_display_text import label
 from adafruit_magtag.magtag import MagTag
+import json
 
 
 # Get wifi details and more from a secrets.py file
@@ -75,7 +76,62 @@ def get_time_to_next_wake(current_time):
     return wt.isoformat(), diff
 
 
-def update_display(ct, wt, q):
+def get_date(wt):
+    '''
+    Look up current date
+    Return today and tomorrow in "m-d-yyyy" format
+    :return:
+    '''
+    return '2-23-2022'
+    
+
+def get_entrees(requests, next_date):
+    print(next_date)
+    menu_base_url = secrets['school_lunch_api_url']
+
+    payload = {
+        'buildingId': secrets['school_lunch_buildingId'],
+        'districtId': secrets['school_lunch_districtId'],
+        "startDate": next_date,
+        "endDate": next_date
+    }
+
+    url = '{}?{}'.format(menu_base_url, '&'.join(['{}={}'.format(key, payload[key]) for key in payload]))
+    p = requests.get(url)
+    menu = p.json()  # json.loads(p.text)
+    for s in menu['FamilyMenuSessions']:
+        if ('Lunch' in s.get('ServingSession', '')):
+            menu = s['MenuPlans'][0]
+    # print(menu['MenuPlanName'])
+    ignore_words = {'Bagel', 'SunButter', 'Soybutter', 'Smoothie'}
+    menu_items = {}
+    for daily_menu in menu['Days']:
+        entrees = [e['RecipeName'] for e in daily_menu['RecipeCategories'][0]['Recipes']]
+        filtered_entrees = []
+        for e in entrees:
+            if len([w for w in e.split(' ') if w in ignore_words]) == 0:
+                filtered_entrees.append(e)
+        # print('{}: {}'.format(daily_menu.get('Date'), filtered_entrees))
+        # menu_items[daily_menu.get('Date')] = filtered_entrees
+    if len(filtered_entrees) == 0:
+        return  ['Make your own lunch']
+    # wrap menu text
+    wrapped_menu = []
+    this_line = ''
+    for entree in filtered_entrees:
+        for word in entree.split(' '):
+            if len(this_line) > 0:
+                this_line = this_line + ' '
+            if len(this_line) + len(word) > 29:
+                wrapped_menu.append(this_line)
+                this_line = ''
+            this_line = this_line + word
+        if len(this_line) > 0:
+            wrapped_menu.append(this_line)
+        this_line = ''
+    return  wrapped_menu
+
+def update_display(ct, wt, q, m):
     # use built in display (PyPortal, PyGamer, PyBadge, CLUE, etc.)
     # see guide for setting up external displays (TFT / OLED breakouts, RGB matrices, etc.)
     # https://learn.adafruit.com/circuitpython-display-support-using-displayio/display-and-display-bus
@@ -108,11 +164,28 @@ def update_display(ct, wt, q):
         padding_right=4,
         padding_left=4,
     )
-    # centered
-    another_text.anchor_point = (0.5, 0.5)
-    another_text.anchored_position = (display.width // 2, display.height // 2)
+    # left-justified middle
+    another_text.anchor_point = (-0.1, 0.5)
+    another_text.anchored_position = (0, display.height // 2)
     main_group.append(another_text)
-
+    
+    # Add menu        
+    another_text = label.Label(
+        terminalio.FONT,
+        scale=1,
+        text='{} Lunch\n{}'.format(wt[:10], "\n".join(m)),
+        color=0x000000,
+        background_color=0xFFFFFF,
+        padding_top=0,
+        padding_bottom=0,
+        padding_right=0,
+        padding_left=0,
+        line_spacing=1,
+    )
+    # left-justified middle
+    another_text.anchor_point = (1.1, 0.5)
+    another_text.anchored_position = (display.width, display.height // 2)
+    main_group.append(another_text)
 
     # Last update time
     text_area = label.Label(
@@ -166,7 +239,9 @@ if __name__ == '__main__':
     queue = get_latest_queue(network)
     current_time = get_current_time(network)
     wake_time, sleep_duration = get_time_to_next_wake(current_time)
-    update_display(current_time, wake_time, queue)
+    
+    menu = get_entrees(network, wake_time[:10])
+    update_display(current_time, wake_time, queue, menu)
     magtag = MagTag()
     ding(magtag)
     magtag.exit_and_deep_sleep(sleep_duration)
