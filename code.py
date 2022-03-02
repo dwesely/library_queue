@@ -9,6 +9,7 @@ import board
 import displayio
 import terminalio
 from adafruit_display_text import label
+from adafruit_bitmap_font import bitmap_font
 from adafruit_magtag.magtag import MagTag
 import json
 
@@ -76,15 +77,6 @@ def get_time_to_next_wake(current_time):
     return wt.isoformat(), diff
 
 
-def get_date(wt):
-    '''
-    Look up current date
-    Return today and tomorrow in "m-d-yyyy" format
-    :return:
-    '''
-    return '2-23-2022'
-    
-
 def get_entrees(requests, next_date):
     print(next_date)
     menu_base_url = secrets['school_lunch_api_url']
@@ -103,6 +95,8 @@ def get_entrees(requests, next_date):
         if ('Lunch' in s.get('ServingSession', '')):
             menu = s['MenuPlans'][0]
     # print(menu['MenuPlanName'])
+    if 'MenuPlanName' not in menu:
+        return ['No menu, make your own lunch']
     ignore_words = {'Bagel', 'SunButter', 'Soybutter', 'Smoothie'}
     menu_items = {}
     for daily_menu in menu['Days']:
@@ -114,7 +108,7 @@ def get_entrees(requests, next_date):
         # print('{}: {}'.format(daily_menu.get('Date'), filtered_entrees))
         # menu_items[daily_menu.get('Date')] = filtered_entrees
     if len(filtered_entrees) == 0:
-        return  ['Make your own lunch']
+        return ['Make your own lunch']
     # wrap menu text
     wrapped_menu = []
     this_line = ''
@@ -142,6 +136,7 @@ def update_display(ct, wt, q, m):
 
     # main group to hold everything
     main_group = displayio.Group()
+    number_font = bitmap_font.load_font("/fonts/DejaVuSansMono-Bold-nums-88.bdf")
 
     # white background. Scaled to save RAM
     bg_bitmap = displayio.Bitmap(display.width // 8, display.height // 8, 1)
@@ -154,9 +149,9 @@ def update_display(ct, wt, q, m):
 
     # Remaining Queue
     another_text = label.Label(
-        terminalio.FONT,
-        scale=8,
-        text="{}".format(q),
+        number_font,
+        scale=1,
+        text="{0:02d}".format(q),
         color=0x000000,
         background_color=0xFFFFFF,
         padding_top=1,
@@ -164,23 +159,23 @@ def update_display(ct, wt, q, m):
         padding_right=4,
         padding_left=4,
     )
-    # left-justified middle
+    # left-justified middle, little below center
     another_text.anchor_point = (-0.1, 0.5)
-    another_text.anchored_position = (0, display.height // 2)
+    another_text.anchored_position = (0, (display.height // 2) + 10)
     main_group.append(another_text)
-    
-    # Add menu        
+
+    # Add menu
     another_text = label.Label(
         terminalio.FONT,
         scale=1,
-        text='{} Lunch\n{}'.format(wt[:10], "\n".join(m)),
+        text='_____ {} Lunch _____\n\n{}'.format(wt[:10], "\n".join(m)).rstrip('\n\r\t '),
         color=0x000000,
         background_color=0xFFFFFF,
         padding_top=0,
         padding_bottom=0,
         padding_right=0,
         padding_left=0,
-        line_spacing=1,
+        line_spacing=0.8,
     )
     # left-justified middle
     another_text.anchor_point = (1.1, 0.5)
@@ -239,7 +234,7 @@ if __name__ == '__main__':
     queue = get_latest_queue(network)
     current_time = get_current_time(network)
     wake_time, sleep_duration = get_time_to_next_wake(current_time)
-    
+
     menu = get_entrees(network, wake_time[:10])
     update_display(current_time, wake_time, queue, menu)
     magtag = MagTag()
