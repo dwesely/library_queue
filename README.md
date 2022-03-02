@@ -9,3 +9,6 @@ I used FontForge to trim the font down to just the digits and the letter 'M' fol
 https://learn.adafruit.com/custom-fonts-for-pyportal-circuitpython-display/conversion
 Then generated an 88px bitmap font for the large numbers.
 
+The process this device uses to perform its updates is described in the following sequence diagram:
+![Sequence diagram for the process](library_queue.png)
+(Made using https://sequencediagram.org/)
