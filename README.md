@@ -1,6 +1,8 @@
 # library_queue
-Extract wait list position number from my local library's website
+Extract wait list position number from my local library's website and the next upcoming school lunch from the school website, post on a display on the refridgerator.
 
+The hardware for the dispay is the Adafruit MagTag: https://www.adafruit.com/product/4800
+<br /><img src="08.jpg" width="300" title="MagTag photo">
 
 For the queue numbers, I used Deja Vu Sans Mono - Bold:
 https://fontlibrary.org/en/font/dejavu-sans-mono#DejaVu%20Sans%20Mono-Bold
