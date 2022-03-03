@@ -1,21 +1,25 @@
 // sequencediagram.org
 title Library Queue Display
-note over Library,nextHold.py:Login using Selenium twice daily
-control Windows Task Scheduler
-Windows Task Scheduler->nextHold.py:Trigger update
+participant Library
+participant nextHold.py
+control Win Task Sched
+note over Library,Win Task Sched:Login using Selenium twice daily
+Win Task Sched->nextHold.py:Trigger update
 Library<-nextHold.py:Login and visit "holds" page
-Library->nextHold.py:List of held items and queue positions
+Library->nextHold.py:Data for all held items
 nextHold.py->Adafruit.io:Closest upcoming queue
+
 participant code.py
 participant School
-control magtag
+control MagTag
 boundary display
-magtag->code.py:Wake and execute
-code.py->Adafruit.io:Request latest from NextHold feed
+note over code.py,display:Update display twice daily
+MagTag->code.py:Wake and execute
+code.py->Adafruit.io:Request latest NextHold feed
 code.py<-Adafruit.io:Queue position
 code.py->Adafruit.io:Request current time
 code.py<-Adafruit.io:Current time
-code.py->School:Request menu for next lunch
+code.py->School:Request next lunch menu
 code.py<-School:Menu for the day (JSON)
 code.py->display:Queue, menu, next wake time
-magtag<-code.py:Set timer and sleep
+MagTag<-code.py:Set timer and sleep
