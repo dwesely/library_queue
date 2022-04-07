@@ -6,6 +6,8 @@ from seleniumwire import webdriver
 
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.common.exceptions import NoSuchElementException
+
 
 from selenium.webdriver.common.by import By
 from Adafruit_IO import Client, Feed, Data
@@ -34,12 +36,19 @@ def get_queue_length():
     action.move_to_element(password).click().perform()
     password.send_keys(Keys.ENTER)
 
-    queueLength = driver.find_element(By.CLASS_NAME, "queueLength")
-    print(queueLength.text)
+    queueText = ''
 
-    # Access and print requests via the `requests` attribute
+    try:
+        queueLength = driver.find_element(By.CLASS_NAME, "queueLength")
+        print(queueLength.text)
+        queueText = queueLength.text
+    except NoSuchElementException:
+        print('No queueLength')
+        queueText = '0 No holds detected in queue'
+
+        # Access and print requests via the `requests` attribute
     with open('lcpl.txt', 'w') as outfile:
-        outfile.write(queueLength.text)
+        outfile.write(queueText)
         outfile.write('\n')
         for request in driver.requests:
             if 'Status' in request.url: #request.response
@@ -54,10 +63,12 @@ def get_queue_length():
                     outfile.write(str(request.response.body.decode("utf-8")))
                     outfile.write('\n======\n')
                     if 'holds' in status:
-                        next_up = sorted([(hold['holdQueueLength'], hold['resource']['shortTitle']) for hold in status['holds']])
-                        return next_up[0][0]
+                        next_up = sorted([(int(hold['holdQueueLength']), hold['resource']['shortTitle']) for hold in status['holds']])
+                        return str(next_up[0][0])
+                else:
+                    print("No holdQueueLength")
 
-    return queueLength.text
+    return queueText
 
 
 def send_queue_update(q):
