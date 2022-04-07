@@ -130,13 +130,22 @@ def update_display(ct, wt, q, m):
     # see guide for setting up external displays (TFT / OLED breakouts, RGB matrices, etc.)
     # https://learn.adafruit.com/circuitpython-display-support-using-displayio/display-and-display-bus
     display = board.DISPLAY
+    
+    if q > 0:
+        number_font = bitmap_font.load_font("/fonts/DejaVuSansMono-Bold-nums-88.bdf")
+        menu_font = terminalio.FONT
+        params = {'q_scale': 1, 'm_scale': 1}
+    else:
+        number_font = terminalio.FONT
+        #https://github.com/Tecate/bitmap-fonts/blob/master/bitmap/unscii/unscii-16.pcf
+        menu_font = bitmap_font.load_font("/fonts/unscii-16.pcf")
+        params = {'q_scale': 2, 'm_scale': 1}
 
     # wait until we can draw
     time.sleep(display.time_to_refresh)
 
     # main group to hold everything
     main_group = displayio.Group()
-    number_font = bitmap_font.load_font("/fonts/DejaVuSansMono-Bold-nums-88.bdf")
 
     # white background. Scaled to save RAM
     bg_bitmap = displayio.Bitmap(display.width // 8, display.height // 8, 1)
@@ -150,7 +159,7 @@ def update_display(ct, wt, q, m):
     # Remaining Queue
     another_text = label.Label(
         number_font,
-        scale=1,
+        scale=params['q_scale'],
         text="{0:02d}".format(q),
         color=0x000000,
         background_color=0xFFFFFF,
@@ -166,8 +175,8 @@ def update_display(ct, wt, q, m):
 
     # Add menu
     another_text = label.Label(
-        terminalio.FONT,
-        scale=1,
+        menu_font,
+        scale=params['m_scale'],
         text='_____ {} Lunch _____\n\n{}'.format(wt[:10], "\n".join(m)).rstrip('\n\r\t '),
         color=0x000000,
         background_color=0xFFFFFF,
