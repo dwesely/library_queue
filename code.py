@@ -1,3 +1,5 @@
+import neopixel
+import alarm
 import ipaddress
 import ssl
 import wifi
@@ -77,12 +79,39 @@ def get_time_to_next_wake(current_time):
     return wt.isoformat(), diff
 
 
-def get_entrees(requests, next_date):
+def get_top_quote(requests):
+    # URLs to fetch from
+    TEXT_URL = "https://io.adafruit.com/api/v2/%s/feeds/qotd/data/retain" % secrets['aio_username']
+
+    # print("Fetching text from", TEXT_URL)
+    response = requests.get(TEXT_URL)
+    try:
+        quote = response.text.strip(',\r\n\t ')[1:-1].replace('""','"')
+        # print(quote)
+        #Wrap the quote
+        wrapped_quote = []
+        this_line = ''
+        for word in quote.split(' '):
+            if len(this_line) > 0:
+                this_line = this_line + ' '
+            if len(this_line) + len(word) > 29:
+                wrapped_quote.append(this_line)
+                this_line = ''
+            this_line = this_line + word
+        if len(this_line) > 0:
+            wrapped_quote.append(this_line)
+        this_line = ''
+        return wrapped_quote
+    except BaseException:
+        return ''
+
+
+def get_entrees(requests, next_date, school):
     print(next_date)
     menu_base_url = secrets['school_lunch_api_url']
 
     payload = {
-        'buildingId': secrets['school_lunch_buildingId'],
+        'buildingId': secrets[school],
         'districtId': secrets['school_lunch_districtId'],
         "startDate": next_date,
         "endDate": next_date
@@ -96,7 +125,8 @@ def get_entrees(requests, next_date):
             menu = s['MenuPlans'][0]
     # print(menu['MenuPlanName'])
     if 'MenuPlanName' not in menu:
-        return ['No menu, make your own lunch']
+        #return ['No menu, make your own lunch']
+        return(get_top_quote(requests))
     ignore_words = {'Bagel', 'SunButter', 'Soybutter', 'Smoothie'}
     menu_items = {}
     for daily_menu in menu['Days']:
@@ -104,7 +134,7 @@ def get_entrees(requests, next_date):
         filtered_entrees = []
         for e in entrees:
             if len([w for w in e.split(' ') if w in ignore_words]) == 0:
-                filtered_entrees.append(e)
+                filtered_entrees.append(e.replace(' - MS/HS', ''))
         # print('{}: {}'.format(daily_menu.get('Date'), filtered_entrees))
         # menu_items[daily_menu.get('Date')] = filtered_entrees
     if len(filtered_entrees) == 0:
@@ -112,6 +142,7 @@ def get_entrees(requests, next_date):
     # wrap menu text
     wrapped_menu = []
     this_line = ''
+
     for entree in filtered_entrees:
         for word in entree.split(' '):
             if len(this_line) > 0:
@@ -125,12 +156,12 @@ def get_entrees(requests, next_date):
         this_line = ''
     return  wrapped_menu
 
-def update_display(ct, wt, q, m):
+def update_display(ct, wt, q, m, sn):
     # use built in display (PyPortal, PyGamer, PyBadge, CLUE, etc.)
     # see guide for setting up external displays (TFT / OLED breakouts, RGB matrices, etc.)
     # https://learn.adafruit.com/circuitpython-display-support-using-displayio/display-and-display-bus
     display = board.DISPLAY
-    
+
     if q > 0:
         number_font = bitmap_font.load_font("/fonts/DejaVuSansMono-Bold-nums-88.bdf")
         menu_font = terminalio.FONT
@@ -206,6 +237,41 @@ def update_display(ct, wt, q, m):
     text_area.y = 14
     main_group.append(text_area)
 
+
+    bg_for_school = {1: 0xFFFFFF, 2:0xFFFFFF}
+    bg_for_school[sn] = 0x333333
+    fg_for_school = {1: 0x000000, 2:0x000000}
+    fg_for_school[sn] = 0xFFFFFF
+    # school 1
+    school_1 = label.Label(
+        terminalio.FONT,
+        text='Elementary',
+        color=fg_for_school[1],
+        background_color=bg_for_school[1],
+        padding_top=0,
+        padding_bottom=0,
+        padding_right=3,
+        padding_left=3,
+    )
+    school_1.anchor_point = (0.0, 1.0)
+    school_1.anchored_position = (0.0, display.height)
+    main_group.append(school_1)
+
+    # school 2
+    school_2 = label.Label(
+        terminalio.FONT,
+        text='Middle',
+        color=fg_for_school[2],
+        background_color=bg_for_school[2],
+        padding_top=0,
+        padding_bottom=0,
+        padding_right=3,
+        padding_left=3,
+    )
+    school_2.anchor_point = (2.0, 1.0)
+    school_2.anchored_position = (display.width, display.height)
+    main_group.append(school_2)
+
     # show the main group and refresh.
     display.show(main_group)
     display.refresh()
@@ -219,33 +285,55 @@ YELLOW = 0x884400
 CYAN = 0x0088BB
 MAGENTA = 0x9900BB
 WHITE = 0x888888
+BURGUNDY = 0x800020
+LAVENDER = 0x9370DB
 
 
-def ding(device):
-    def blink(color, duration):
+def ding(device, color, blinks, audible=False):
+    def blink(duration):
         device.peripherals.neopixel_disable = False
         device.peripherals.neopixels.fill(color)
         time.sleep(duration)
         device.peripherals.neopixel_disable = True
-    d = 0.15
-    device.peripherals.play_tone(440, d)
-    device.peripherals.play_tone(880, d)
-    blink(RED, 0.2)
-    blink(YELLOW, 0.2)
-    blink(GREEN, 0.2)
-    blink(CYAN, 0.2)
-    blink(BLUE, 0.2)
-    blink(MAGENTA, 0.2)
+        time.sleep(duration)
+    if audible:
+        d = 0.15
+        device.peripherals.play_tone(440, d)
+        device.peripherals.play_tone(880, d)
+    for i in range(0, blinks, 1):
+        blink(0.2)
+
 
 
 if __name__ == '__main__':
+    magtag = MagTag()
+
+    # detect and set which school to display
+    school_color = LAVENDER
+    school_number = 1
+    if alarm.wake_alarm is not None:
+        if repr(alarm.wake_alarm.pin) == 'board.BUTTON_D':
+            school_color = BURGUNDY
+            school_number = 2
+    ding(magtag, school_color, 1)
+
     network = connect_to_wifi()
+    ding(magtag, school_color, 2)
     queue = get_latest_queue(network)
     current_time = get_current_time(network)
     wake_time, sleep_duration = get_time_to_next_wake(current_time)
 
-    menu = get_entrees(network, wake_time[:10])
-    update_display(current_time, wake_time, queue, menu)
-    magtag = MagTag()
-    ding(magtag)
-    magtag.exit_and_deep_sleep(sleep_duration)
+    time_alarm = alarm.time.TimeAlarm(monotonic_time=sleep_duration)
+
+    menu = get_entrees(network, wake_time[:10], f'school_lunch_buildingId{school_number}')
+    ding(magtag, school_color, 3)
+    update_display(current_time, wake_time, queue, menu, school_number)
+    ding(magtag, school_color, 4, True)
+    # magtag.exit_and_deep_sleep(sleep_duration)
+
+    # Deinitialize pins and set wakeup alarms
+    magtag.peripherals.buttons[0].deinit()
+    magtag.peripherals.buttons[3].deinit()
+    pin_alarm_mtv = alarm.pin.PinAlarm(pin=board.D15, value=False, pull=True)
+    pin_alarm_br = alarm.pin.PinAlarm(pin=board.D11, value=False, pull=True)
+    alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm_mtv, pin_alarm_br)
