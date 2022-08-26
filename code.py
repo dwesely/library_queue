@@ -99,7 +99,7 @@ def get_top_quote(requests):
                 this_line = ''
             this_line = this_line + word
         if len(this_line) > 0:
-            wrapped_quote.append(this_line)
+            wrapped_quote.append(this_line.strip(' '))
         this_line = ''
         return wrapped_quote
     except BaseException:
@@ -223,7 +223,7 @@ def update_display(ct, wt, q, m, sn):
         line_spacing=0.8,
     )
     # left-justified middle
-    another_text.anchor_point = (1.1, 0.5)
+    another_text.anchor_point = (1.0, 0.5)
     another_text.anchored_position = (display.width, display.height // 2)
     main_group.append(another_text)
 
@@ -290,7 +290,7 @@ YELLOW = 0x884400
 CYAN = 0x0088BB
 MAGENTA = 0x9900BB
 WHITE = 0x888888
-BURGUNDY = 0x800020
+BURGUNDY = 0x870A30
 LAVENDER = 0x9370DB
 
 
@@ -314,6 +314,7 @@ if __name__ == '__main__':
     magtag = MagTag()
 
     # detect and set which school to display
+    # set default then check if alternate button was pressed
     school_color = LAVENDER
     school_number = 1
     if isinstance(alarm.wake_alarm, alarm.pin.PinAlarm):
