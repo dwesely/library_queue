@@ -118,7 +118,12 @@ def get_entrees(requests, next_date, school):
     }
 
     url = '{}?{}'.format(menu_base_url, '&'.join(['{}={}'.format(key, payload[key]) for key in payload]))
-    p = requests.get(url)
+    
+    try:
+        p = requests.get(url)
+    except:
+       return ['Error: Unable to connect to menu.'] 
+       
     menu = p.json()  # json.loads(p.text)
     for s in menu['FamilyMenuSessions']:
         if ('Lunch' in s.get('ServingSession', '')):
@@ -311,7 +316,7 @@ if __name__ == '__main__':
     # detect and set which school to display
     school_color = LAVENDER
     school_number = 1
-    if alarm.wake_alarm is not None:
+    if isinstance(alarm.wake_alarm, alarm.pin.PinAlarm):
         if repr(alarm.wake_alarm.pin) == 'board.BUTTON_D':
             school_color = BURGUNDY
             school_number = 2
