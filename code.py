@@ -118,12 +118,12 @@ def get_entrees(requests, next_date, school):
     }
 
     url = '{}?{}'.format(menu_base_url, '&'.join(['{}={}'.format(key, payload[key]) for key in payload]))
-    
+
     try:
         p = requests.get(url)
     except:
-       return ['Error: Unable to connect to menu.'] 
-       
+       return ['Error: Unable to connect to menu.']
+
     menu = p.json()  # json.loads(p.text)
     for s in menu['FamilyMenuSessions']:
         if ('Lunch' in s.get('ServingSession', '')):
@@ -132,7 +132,7 @@ def get_entrees(requests, next_date, school):
     if 'MenuPlanName' not in menu:
         #return ['No menu, make your own lunch']
         return(get_top_quote(requests))
-    ignore_words = {'Bagel', 'SunButter', 'Soybutter', 'Smoothie'}
+    ignore_words = {'Bagel', 'SunButter', 'Soybutter', 'Smoothie', 'OPTION:'}
     menu_items = {}
     for daily_menu in menu['Days']:
         entrees = [e['RecipeName'] for e in daily_menu['RecipeCategories'][0]['Recipes']]
