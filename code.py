@@ -30,8 +30,11 @@ def connect_to_wifi():
     # print("My IP address is", wifi.radio.ipv4_address)
 
     pool = socketpool.SocketPool(wifi.radio)
-    requests = adafruit_requests.Session(pool, ssl.create_default_context())
-
+    try:
+        requests = adafruit_requests.Session(pool, ssl.create_default_context())
+    except:
+        print('Unable to connect to wifi.')
+        return
     return requests
 
 
@@ -161,7 +164,7 @@ def get_entrees(requests, next_date, school):
         this_line = ''
     return  wrapped_menu
 
-def update_display(ct, wt, q, m, sn):
+def update_display(ct, wt, q, m, sn, v):
     # use built in display (PyPortal, PyGamer, PyBadge, CLUE, etc.)
     # see guide for setting up external displays (TFT / OLED breakouts, RGB matrices, etc.)
     # https://learn.adafruit.com/circuitpython-display-support-using-displayio/display-and-display-bus
@@ -276,6 +279,22 @@ def update_display(ct, wt, q, m, sn):
     school_2.anchor_point = (2.0, 1.0)
     school_2.anchored_position = (display.width, display.height)
     main_group.append(school_2)
+    
+    
+    # battery status
+    battery = label.Label(
+        terminalio.FONT,
+        text='{:.2f}v'.format(v),
+        color=0x000000,
+        background_color=0xFFFFFF,
+        padding_top=0,
+        padding_bottom=0,
+        padding_right=3,
+        padding_left=3,
+    )
+    battery.anchor_point = (0.5, 1.0)
+    battery.anchored_position = (display.width/2, display.height)
+    main_group.append(battery)
 
     # show the main group and refresh.
     display.show(main_group)
@@ -333,7 +352,10 @@ if __name__ == '__main__':
 
     menu = get_entrees(network, wake_time[:10], f'school_lunch_buildingId{school_number}')
     ding(magtag, school_color, 3)
-    update_display(current_time, wake_time, queue, menu, school_number)
+    
+    voltage = magtag.peripherals.battery
+    voltage = magtag.peripherals.battery
+    update_display(current_time, wake_time, queue, menu, school_number, voltage)
     ding(magtag, school_color, 4, True)
     # magtag.exit_and_deep_sleep(sleep_duration)
 
