@@ -58,7 +58,7 @@ def get_current_time(requests):
     aio_username = secrets["aio_username"]
     aio_key = secrets["aio_key"]
     location = secrets.get("timezone", None)
-    TIME_URL = "https://io.adafruit.com/api/v2/%s/integrations/time/strftime?x-aio-key=%s" % (aio_username, aio_key)
+    TIME_URL = "https://io.adafruit.com/api/v2/%s/integrations/time/strftime?x-aio-key=%s&tz=%s" % (aio_username, aio_key, location)
     TIME_URL += "&fmt=%25Y-%25m-%25dT%25H%3A%25M"
     response = requests.get(TIME_URL)
     return response.text
