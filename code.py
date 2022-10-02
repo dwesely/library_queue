@@ -142,7 +142,7 @@ def get_entrees(requests, next_date, school):
         filtered_entrees = []
         for e in entrees:
             if len([w for w in e.split(' ') if w in ignore_words]) == 0:
-                filtered_entrees.append(e.replace(' - MS/HS', ''))
+                filtered_entrees.append(e.replace(' - MS/HS', '').replace('Sandwich', 'SW'))
         # print('{}: {}'.format(daily_menu.get('Date'), filtered_entrees))
         # menu_items[daily_menu.get('Date')] = filtered_entrees
     if len(filtered_entrees) == 0:
