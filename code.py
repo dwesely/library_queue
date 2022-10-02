@@ -43,8 +43,8 @@ def get_latest_queue(requests):
     TEXT_URL = "https://io.adafruit.com/api/v2/%s/feeds/nexthold/data/retain" % secrets['aio_username']
 
     # print("Fetching text from", TEXT_URL)
-    response = requests.get(TEXT_URL)
     try:
+        response = requests.get(TEXT_URL)
         q = int(response.text.split(',')[0])
         # print(q)
         return q
@@ -60,8 +60,11 @@ def get_current_time(requests):
     location = secrets.get("timezone", None)
     TIME_URL = "https://io.adafruit.com/api/v2/%s/integrations/time/strftime?x-aio-key=%s&tz=%s" % (aio_username, aio_key, location)
     TIME_URL += "&fmt=%25Y-%25m-%25dT%25H%3A%25M"
-    response = requests.get(TIME_URL)
-    return response.text
+    try:
+        response = requests.get(TIME_URL)
+        return response.text
+    except BaseException:
+        return '2000-01-01T00:00'
 
 
 def get_time_to_next_wake(current_time):
@@ -87,8 +90,8 @@ def get_top_quote(requests):
     TEXT_URL = "https://io.adafruit.com/api/v2/%s/feeds/qotd/data/retain" % secrets['aio_username']
 
     # print("Fetching text from", TEXT_URL)
-    response = requests.get(TEXT_URL)
     try:
+        response = requests.get(TEXT_URL)
         quote = response.text.strip(',\r\n\t ')[1:-1].replace('""','"')
         # print(quote)
         #Wrap the quote
@@ -279,8 +282,8 @@ def update_display(ct, wt, q, m, sn, v):
     school_2.anchor_point = (2.0, 1.0)
     school_2.anchored_position = (display.width, display.height)
     main_group.append(school_2)
-    
-    
+
+
     # battery status
     battery = label.Label(
         terminalio.FONT,
@@ -352,7 +355,7 @@ if __name__ == '__main__':
 
     menu = get_entrees(network, wake_time[:10], f'school_lunch_buildingId{school_number}')
     ding(magtag, school_color, 3)
-    
+
     voltage = magtag.peripherals.battery
     voltage = magtag.peripherals.battery
     update_display(current_time, wake_time, queue, menu, school_number, voltage)
