@@ -313,22 +313,24 @@ CYAN = 0x0088BB
 MAGENTA = 0x9900BB
 WHITE = 0x888888
 BURGUNDY = 0x870A30
-LAVENDER = 0x9370DB
+LAVENDER = 0x7c4fef # 0x9370DB
 
 
 def ding(device, color, blinks, audible=False):
-    def blink(duration):
+    audible=False
+    def fillright():
         device.peripherals.neopixel_disable = False
-        device.peripherals.neopixels.fill(color)
-        time.sleep(duration)
-        device.peripherals.neopixel_disable = True
-        time.sleep(duration)
+        device.peripherals.neopixels.brightness = 0.05
+        for p in range(0, blinks):
+            device.peripherals.neopixels[3 - p] = color
+        if blinks > 3:
+            time.sleep(1)
+            device.peripherals.neopixel_disable = True
     if audible:
         d = 0.15
         device.peripherals.play_tone(440, d)
         device.peripherals.play_tone(880, d)
-    for i in range(0, blinks, 1):
-        blink(0.2)
+    fillright()
 
 
 
