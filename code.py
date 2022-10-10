@@ -317,7 +317,6 @@ LAVENDER = 0x7c4fef # 0x9370DB
 
 
 def ding(device, color, blinks, audible=False):
-    audible=False
     def fillright():
         device.peripherals.neopixel_disable = False
         device.peripherals.neopixels.brightness = 0.05
@@ -339,12 +338,16 @@ if __name__ == '__main__':
 
     # detect and set which school to display
     # set default then check if alternate button was pressed
+    # Elementary Lunch (default)
     school_color = LAVENDER
     school_number = 1
+    boodeep = True
     if isinstance(alarm.wake_alarm, alarm.pin.PinAlarm):
         if repr(alarm.wake_alarm.pin) == 'board.BUTTON_D':
+            # Middle Lunch
             school_color = BURGUNDY
             school_number = 2
+            boodeep = False
     ding(magtag, school_color, 1)
 
     network = connect_to_wifi()
@@ -361,7 +364,7 @@ if __name__ == '__main__':
     voltage = magtag.peripherals.battery
     voltage = magtag.peripherals.battery
     update_display(current_time, wake_time, queue, menu, school_number, voltage)
-    ding(magtag, school_color, 4, True)
+    ding(magtag, school_color, 4, boodeep)
     # magtag.exit_and_deep_sleep(sleep_duration)
 
     # Deinitialize pins and set wakeup alarms
