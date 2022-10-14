@@ -317,19 +317,22 @@ LAVENDER = 0x7c4fef # 0x9370DB
 
 
 def ding(device, color, blinks, audible=False):
-    def fillright():
+    def sweepright():
         device.peripherals.neopixel_disable = False
         device.peripherals.neopixels.brightness = 0.05
         for p in range(0, blinks):
-            device.peripherals.neopixels[3 - p] = color
+            if p < blinks - 1:
+                device.peripherals.neopixels[3 - p] = 0
+            else:
+                device.peripherals.neopixels[3 - p] = color
         if blinks > 3:
-            time.sleep(1)
+            time.sleep(2)
             device.peripherals.neopixel_disable = True
     if audible:
         d = 0.15
         device.peripherals.play_tone(440, d)
         device.peripherals.play_tone(880, d)
-    fillright()
+    sweepright()
 
 
 
