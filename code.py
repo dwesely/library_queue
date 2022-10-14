@@ -25,17 +25,17 @@ except ImportError:
 
 def connect_to_wifi():
     # print("Connecting to %s" % secrets["ssid"])
-    wifi.radio.connect(secrets["ssid"], secrets["password"])
-    # print("Connected to %s!" % secrets["ssid"])
-    # print("My IP address is", wifi.radio.ipv4_address)
-
-    pool = socketpool.SocketPool(wifi.radio)
     try:
+        wifi.radio.connect(secrets["ssid"], secrets["password"])
+        # print("Connected to %s!" % secrets["ssid"])
+        # print("My IP address is", wifi.radio.ipv4_address)
+
+        pool = socketpool.SocketPool(wifi.radio)
         requests = adafruit_requests.Session(pool, ssl.create_default_context())
+        return requests
     except:
         print('Unable to connect to wifi.')
         return
-    return requests
 
 
 def get_latest_queue(requests):
