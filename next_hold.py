@@ -63,7 +63,8 @@ def get_queue_length():
                     outfile.write(str(request.response.body.decode("utf-8")))
                     outfile.write('\n======\n')
                     if 'holds' in status:
-                        next_up = sorted([(int(hold['holdQueueLength']), hold['resource']['shortTitle']) for hold in status['holds']])
+                        # If hold is in transit, add 1 so it only shows 0 if the hold is already at the library
+                        next_up = sorted([(int(hold['holdQueueLength']) + int(hold['status']=='T'), hold['resource']['shortTitle']) for hold in status['holds']])
                         return str(next_up[0][0])
                 else:
                     print("No holdQueueLength")
