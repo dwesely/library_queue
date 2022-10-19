@@ -67,7 +67,7 @@ def get_current_time(requests):
         response.close()
         return time_text
     except BaseException:
-        return '2000-01-01T00:00'
+        return '2000-01-01T11:59'
 
 
 def get_time_to_next_wake(current_time):
