@@ -46,6 +46,7 @@ def get_latest_queue(requests):
     try:
         response = requests.get(TEXT_URL)
         q = int(response.text.split(',')[0])
+        response.close()
         # print(q)
         return q
     except BaseException:
@@ -62,7 +63,9 @@ def get_current_time(requests):
     TIME_URL += "&fmt=%25Y-%25m-%25dT%25H%3A%25M"
     try:
         response = requests.get(TIME_URL)
-        return response.text
+        time_text = response.text
+        response.close()
+        return time_text
     except BaseException:
         return '2000-01-01T00:00'
 
@@ -93,6 +96,7 @@ def get_top_quote(requests):
     try:
         response = requests.get(TEXT_URL)
         quote = response.text.strip(',\r\n\t ')[1:-1].replace('""','"')
+        response.close()
         # print(quote)
         #Wrap the quote
         wrapped_quote = []
