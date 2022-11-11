@@ -135,10 +135,13 @@ def get_entrees(requests, next_date, school):
        return ['Error: Unable to connect to menu.']
 
     menu = p.json()  # json.loads(p.text)
-    for s in menu['FamilyMenuSessions']:
-        if ('Lunch' in s.get('ServingSession', '')):
-            menu = s['MenuPlans'][0]
-    # print(menu['MenuPlanName'])
+
+    if 'FamilyMenuSessions' in menu:
+        for s in menu['FamilyMenuSessions']:
+            if ('Lunch' in s.get('ServingSession', '')):
+                menu = s['MenuPlans'][0]
+        # print(menu['MenuPlanName'])
+
     if 'MenuPlanName' not in menu:
         #return ['No menu, make your own lunch']
         return(get_top_quote(requests))
@@ -223,7 +226,7 @@ def update_display(ct, wt, q, m, sn, v):
     another_text = label.Label(
         menu_font,
         scale=params['m_scale'],
-        text='_____ {} Lunch _____\n\n{}'.format(wt[:10], "\n".join(m)).rstrip('\n\r\t '),
+        text='_____ {} Lunch _____\n{}'.format(wt[:10], "\n".join(m)).rstrip('\n\r\t '),
         color=0x000000,
         background_color=0xFFFFFF,
         padding_top=0,
@@ -319,19 +322,42 @@ WHITE = 0x888888
 BURGUNDY = 0x870A30
 LAVENDER = 0x7c4fef # 0x9370DB
 
+def wake_up(device):
+    '''
+    Wake up the parts of the device we will be using
+    '''
+    device.peripherals.neopixel_disable = False
+
+    # No brightness control, it actually draws more power than running default brightness:
+    # https://learn.adafruit.com/circuitpython-essentials/circuitpython-neopixel
+    # "You can drive 300 NeoPixel LEDs with brightness control
+    #  (set brightness=1.0 in object creation) and 1000 LEDs without.
+    #  That's because to adjust the brightness we have to dynamically
+    #  recreate the data-stream each write.
+
+    # device.peripherals.neopixels.brightness = 0.05
+
+    '''
+    Other power considerations:
+    https://learn.adafruit.com/adafruit-magtag?view=all
+    '''
+
+def tuck_in(device):
+    device.peripherals.neopixel_disable = True
+    device.peripherals.buttons[0].deinit()
+    device.peripherals.buttons[3].deinit()
+    pass
+
 
 def ding(device, color, blinks, audible=False):
     def sweepright():
-        device.peripherals.neopixel_disable = False
-        device.peripherals.neopixels.brightness = 0.05
         for p in range(0, blinks):
             if p < blinks - 1:
                 device.peripherals.neopixels[3 - p] = 0
             else:
                 device.peripherals.neopixels[3 - p] = color
         if blinks > 3:
-            time.sleep(2)
-            device.peripherals.neopixel_disable = True
+            time.sleep(1)
     if audible:
         d = 0.15
         device.peripherals.play_tone(440, d)
@@ -355,6 +381,8 @@ if __name__ == '__main__':
             school_color = BURGUNDY
             school_number = 2
             boodeep = False
+
+    wake_up(magtag)
     ding(magtag, school_color, 1)
 
     network = connect_to_wifi()
@@ -375,8 +403,7 @@ if __name__ == '__main__':
     # magtag.exit_and_deep_sleep(sleep_duration)
 
     # Deinitialize pins and set wakeup alarms
-    magtag.peripherals.buttons[0].deinit()
-    magtag.peripherals.buttons[3].deinit()
+    tuck_in(magtag)
     pin_alarm_mtv = alarm.pin.PinAlarm(pin=board.D15, value=False, pull=True)
     pin_alarm_br = alarm.pin.PinAlarm(pin=board.D11, value=False, pull=True)
     alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm_mtv, pin_alarm_br)
