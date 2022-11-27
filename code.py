@@ -256,9 +256,9 @@ def update_display(ct, wt, q, m, sn, v):
     main_group.append(text_area)
 
 
-    bg_for_school = {1: 0xFFFFFF, 2:0xFFFFFF}
+    bg_for_school = {0:0xFFFFFF, 1: 0xFFFFFF, 2:0xFFFFFF}
     bg_for_school[sn] = 0x333333
-    fg_for_school = {1: 0x000000, 2:0x000000}
+    fg_for_school = {0:0xFFFFFF, 1: 0x000000, 2:0x000000}
     fg_for_school[sn] = 0xFFFFFF
     # school 1
     school_1 = label.Label(
@@ -372,15 +372,18 @@ if __name__ == '__main__':
     # detect and set which school to display
     # set default then check if alternate button was pressed
     # Elementary Lunch (default)
-    school_color = LAVENDER
-    school_number = 1
     boodeep = True
+    school_color = GREEN
+    school_number = 0
     if isinstance(alarm.wake_alarm, alarm.pin.PinAlarm):
+        boodeep = False
         if repr(alarm.wake_alarm.pin) == 'board.BUTTON_D':
             # Middle Lunch
             school_color = BURGUNDY
             school_number = 2
-            boodeep = False
+        else:
+            school_color = LAVENDER
+            school_number = 1
 
     wake_up(magtag)
     ding(magtag, school_color, 1)
@@ -393,7 +396,10 @@ if __name__ == '__main__':
 
     time_alarm = alarm.time.TimeAlarm(monotonic_time=sleep_duration)
 
-    menu = get_entrees(network, wake_time[:10], f'school_lunch_buildingId{school_number}')
+    if school_number > 0:
+        menu = get_entrees(network, wake_time[:10], f'school_lunch_buildingId{school_number}')
+    else:
+        menu = get_top_quote(network)
     # menu = ['blah', 'blah']
     ding(magtag, school_color, 3)
 
@@ -401,7 +407,7 @@ if __name__ == '__main__':
     voltage = magtag.peripherals.battery
     update_display(current_time, wake_time, queue, menu, school_number, voltage)
     ding(magtag, school_color, 4, boodeep)
-
+    
     # Deinitialize pins and set wakeup alarms
     tuck_in(magtag)
     pin_alarm_mtv = alarm.pin.PinAlarm(pin=board.D15, value=False, pull=True)
