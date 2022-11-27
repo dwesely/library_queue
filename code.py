@@ -226,7 +226,7 @@ def update_display(ct, wt, q, m, sn, v):
     another_text = label.Label(
         menu_font,
         scale=params['m_scale'],
-        text='_____ {} Lunch _____\n{}'.format(wt[:10], "\n".join(m)).rstrip('\n\r\t '),
+        text='----- {} Lunch -----\n{}'.format(wt[:10], "\n".join(m)).rstrip('\n\r\t '),
         color=0x000000,
         background_color=0xFFFFFF,
         padding_top=0,
@@ -343,9 +343,9 @@ def wake_up(device):
     '''
 
 def tuck_in(device):
-    device.peripherals.neopixel_disable = True
     device.peripherals.buttons[0].deinit()
     device.peripherals.buttons[3].deinit()
+    device.peripherals.neopixel_disable = True
     pass
 
 
@@ -394,16 +394,21 @@ if __name__ == '__main__':
     time_alarm = alarm.time.TimeAlarm(monotonic_time=sleep_duration)
 
     menu = get_entrees(network, wake_time[:10], f'school_lunch_buildingId{school_number}')
+    # menu = ['blah', 'blah']
     ding(magtag, school_color, 3)
 
     voltage = magtag.peripherals.battery
     voltage = magtag.peripherals.battery
     update_display(current_time, wake_time, queue, menu, school_number, voltage)
     ding(magtag, school_color, 4, boodeep)
-    # magtag.exit_and_deep_sleep(sleep_duration)
 
     # Deinitialize pins and set wakeup alarms
     tuck_in(magtag)
     pin_alarm_mtv = alarm.pin.PinAlarm(pin=board.D15, value=False, pull=True)
     pin_alarm_br = alarm.pin.PinAlarm(pin=board.D11, value=False, pull=True)
+
+
+    print(current_time)
+    print(wake_time)
+    print(sleep_duration)
     alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm_mtv, pin_alarm_br)
