@@ -14,6 +14,7 @@ from selenium.webdriver.common.by import By
 from Adafruit_IO import Client, Feed, Data
 import json
 import random
+import time
 from secrets import secrets
 
 
@@ -52,6 +53,7 @@ def get_book_lists(urls, barcode, p):
     password.send_keys(Keys.ENTER)
 
     queueText = ''
+    print('--- Processing holds ---')
 
     try:
         queueLength = driver.find_element(By.CLASS_NAME, "queueLength")
@@ -99,8 +101,10 @@ def get_book_lists(urls, barcode, p):
     # response_count = len(driver.requests)
     del driver.requests
 
+    print('--- Processing loans ---')
     driver.get(loans_url)
     driver.implicitly_wait(30)
+    time.sleep(10)
         # Access and print requests via the `requests` attribute
     with open('lcpl.txt', 'a') as outfile:
         outfile.write('\n')
@@ -119,8 +123,9 @@ def get_book_lists(urls, barcode, p):
                     outfile.write('\n======\n')
                     if 'loans' in status:
                         # Record loans that are overdue
-                        overdue = sorted([loan['resource']['shortTitle'] for loan in status['loans'] if loan['status'] != 'null'])
-                        book_lists['overdue'] = overdue
+                        overdue = sorted([loan['resource']['shortTitle'] for loan in status['loans'] if loan['status'] != None])
+                        if len(overdue) > 0:
+                            book_lists['overdue'] = overdue
                 else:
                     print("No Loans")
 
@@ -231,14 +236,14 @@ if __name__ == '__main__':
     my_position = '0'
     if 'overdue' in combined_list:
         overdue = ', '.join(combined_list['overdue'])
-        alternate_quote = f'OVERDUE: {overdue}'
+        alternate_quote = f'## OVERDUE ##: {overdue}'
     if 'ready' in combined_list:
         ready = ', '.join(combined_list['ready'])
-        alternate_quote = f'{alternate_quote} \nREADY: {ready}'
+        alternate_quote = f'{alternate_quote} \n ## READY ##: {ready}'
     if 'queued' in combined_list:
         next_up = sorted(combined_list['queued'])[0][1]
         my_position = str(sorted(combined_list['queued'])[0][0])
-        alternate_quote = f'{alternate_quote} \nNEXT UP: {next_up}'
+        alternate_quote = f'{alternate_quote} \nDONUT: {next_up}'
     print(alternate_quote)
 
     # current_queue = get_queue_length()
