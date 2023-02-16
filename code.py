@@ -95,7 +95,7 @@ def get_top_quote(requests):
     # print("Fetching text from", TEXT_URL)
     try:
         response = requests.get(TEXT_URL)
-        quote = response.text.strip(',\r\n\t ')[1:-1].replace('""','"')
+        quote = response.text.replace('""','"').strip(',\r\n\t "')
         response.close()
         # print(quote)
         #Wrap the quote
@@ -107,7 +107,12 @@ def get_top_quote(requests):
             if len(this_line) + len(word) > 29:
                 wrapped_quote.append(this_line)
                 this_line = ''
-            this_line = this_line + word
+            if '\n' in word:
+                broken_word = word.split('\n')
+                wrapped_quote.append(this_line + broken_word[0])
+                this_line = '\n'.join(broken_word[1:])
+            else:
+                this_line = this_line + word
         if len(this_line) > 0:
             wrapped_quote.append(this_line.strip(' '))
         this_line = ''
@@ -223,10 +228,14 @@ def update_display(ct, wt, q, m, sn, v):
     main_group.append(another_text)
 
     # Add menu
+    if sn > 0:
+        label_text = '----- {} Lunch -----\n{}'.format(wt[:10], "\n".join(m)).rstrip('\n\r\t ')
+    else:
+        label_text = '-------- {} --------\n{}'.format(wt[:10], "\n".join(m)).rstrip('\n\r\t ')
     another_text = label.Label(
         menu_font,
         scale=params['m_scale'],
-        text='----- {} Lunch -----\n{}'.format(wt[:10], "\n".join(m)).rstrip('\n\r\t '),
+        text=label_text,
         color=0x000000,
         background_color=0xFFFFFF,
         padding_top=0,
@@ -407,7 +416,7 @@ if __name__ == '__main__':
     voltage = magtag.peripherals.battery
     update_display(current_time, wake_time, queue, menu, school_number, voltage)
     ding(magtag, school_color, 4, boodeep)
-    
+
     # Deinitialize pins and set wakeup alarms
     tuck_in(magtag)
     pin_alarm_mtv = alarm.pin.PinAlarm(pin=board.D15, value=False, pull=True)
