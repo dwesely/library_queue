@@ -31,9 +31,11 @@ def get_book_lists(urls, barcode, p):
         driver = webdriver.Chrome()
     except SessionNotCreatedException:
         print(SessionNotCreatedException)
-        return '88 Session not created, check Chromedriver version'
+        book_lists['queued'] = [(88, 'Session not created, check Chromedriver version')]
+        return book_lists
     except BaseException:
-        return '99 Other error'
+        book_lists['queued'] = [(99, 'Other error with Selenium script.')]
+        return book_lists
 
     # Use Holds page to log in
     driver.get(holds_url)
@@ -123,7 +125,8 @@ def get_book_lists(urls, barcode, p):
                     outfile.write('\n======\n')
                     if 'loans' in status:
                         # Record loans that are overdue
-                        overdue = sorted([loan['resource']['shortTitle'] for loan in status['loans'] if loan['status'] != None])
+                        now_millisec = time.time() * 1000
+                        overdue = sorted([loan['resource']['shortTitle'] for loan in status['loans'] if loan['dueDate'] < now_millisec])
                         if len(overdue) > 0:
                             book_lists['overdue'] = overdue
                 else:
@@ -236,20 +239,20 @@ if __name__ == '__main__':
     my_position = '0'
     if 'overdue' in combined_list:
         overdue = ', '.join(combined_list['overdue'])
-        alternate_quote = f'## OVERDUE ##: {overdue}'
+        alternate_quote = f'# DUE #: {overdue}'
     if 'ready' in combined_list:
         ready = ', '.join(combined_list['ready'])
-        alternate_quote = f'{alternate_quote} \n ## READY ##: {ready}'
+        alternate_quote = f'{alternate_quote} \n# RDY #: {ready}'
     if 'queued' in combined_list:
         next_up = sorted(combined_list['queued'])[0][1]
         my_position = str(sorted(combined_list['queued'])[0][0])
-        alternate_quote = f'{alternate_quote} \nDONUT: {next_up}'
+        alternate_quote = f"{alternate_quote} \nQueued: {next_up}"
     print(alternate_quote)
 
     # current_queue = get_queue_length()
     #if current_queue:
         # my_position = current_queue.split(' ')[0]
     if alternate_quote:
-        quote = alternate_quote
+        quote = alternate_quote.strip(' \t\n\r')
     send_queue_update(my_position, quote)
     print(f'Complete, updated with queue {my_position}')
