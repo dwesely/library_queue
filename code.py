@@ -15,6 +15,13 @@ from adafruit_bitmap_font import bitmap_font
 from adafruit_magtag.magtag import MagTag
 import json
 
+# Buttons
+BTN_ELEM = 0
+BTN_MID = 3
+BTN_PREV = 1
+BTN_NEXT = 2
+
+weekday_text = {0: 'Mo', 1: 'Tu', 2: 'We', 3: 'Th', 4: 'Fr', 5: 'Sa', 6: 'Su'}
 
 # Get wifi details and more from a secrets.py file
 try:
@@ -179,7 +186,7 @@ def get_entrees(requests, next_date, school):
         this_line = ''
     return  wrapped_menu
 
-def update_display(ct, wt, q, m, sn, v):
+def update_display(ct, wt, ld, wd, q, m, sn, v):
     # use built in display (PyPortal, PyGamer, PyBadge, CLUE, etc.)
     # see guide for setting up external displays (TFT / OLED breakouts, RGB matrices, etc.)
     # https://learn.adafruit.com/circuitpython-display-support-using-displayio/display-and-display-bus
@@ -229,9 +236,9 @@ def update_display(ct, wt, q, m, sn, v):
 
     # Add menu
     if sn > 0:
-        label_text = '----- {} Lunch -----\n{}'.format(wt[:10], "\n".join(m)).rstrip('\n\r\t ')
+        label_text = '---- {} {} Lunch ---\n{}'.format(wd, ld, "\n".join(m)).rstrip('\n\r\t ')
     else:
-        label_text = '-------- {} --------\n{}'.format(wt[:10], "\n".join(m)).rstrip('\n\r\t ')
+        label_text = '------- {} {} ------\n{}'.format(wd, ld, "\n".join(m)).rstrip('\n\r\t ')
     another_text = label.Label(
         menu_font,
         scale=params['m_scale'],
@@ -352,26 +359,42 @@ def wake_up(device):
     '''
 
 def tuck_in(device):
-    device.peripherals.buttons[0].deinit()
-    device.peripherals.buttons[3].deinit()
+    device.peripherals.buttons[BTN_ELEM].deinit()
+    device.peripherals.buttons[BTN_MID].deinit()
     device.peripherals.neopixel_disable = True
     pass
 
 
-def ding(device, color, blinks, audible=False):
+def ding(device, color, blinks, audible=False, wait_for_button=False):
     def sweepright():
         for p in range(0, blinks):
             if p < blinks - 1:
                 device.peripherals.neopixels[3 - p] = 0
             else:
                 device.peripherals.neopixels[3 - p] = color
-        if blinks > 3:
-            time.sleep(1)
+        if wait_for_button:
+            scroll_pause_delay = time.time() + 20
+            while time.time() < scroll_pause_delay:
+                # debug
+                if device.peripherals.button_b_pressed:
+                    device.peripherals.neopixels[0] = 0
+                    device.peripherals.neopixels[2] = color
+                    return -1
+                elif device.peripherals.button_c_pressed:
+                    device.peripherals.neopixels[0] = 0
+                    device.peripherals.neopixels[1] = color
+                    return 1
+                elif device.peripherals.button_d_pressed:
+                    return 0
+                elif device.peripherals.button_a_pressed:
+                    return 0
+        return 0
     if audible:
         d = 0.15
         device.peripherals.play_tone(440, d)
         device.peripherals.play_tone(880, d)
-    sweepright()
+    pressed = sweepright()
+    return pressed
 
 
 
@@ -405,25 +428,37 @@ if __name__ == '__main__':
 
     time_alarm = alarm.time.TimeAlarm(monotonic_time=sleep_duration)
 
-    if school_number > 0:
-        menu = get_entrees(network, wake_time[:10], f'school_lunch_buildingId{school_number}')
-    else:
-        menu = get_top_quote(network)
-    # menu = ['blah', 'blah']
-    ding(magtag, school_color, 3)
+    scroll = 0
+    lunch_time = wake_time
+    checking_school = school_number > 0
+    while True:
+        if checking_school:
+            if scroll != 0:
+                lunch_time = (datetime.fromisoformat(lunch_time) + timedelta(days=scroll)).isoformat()
+            lunch_date = lunch_time[:10]
+            menu = get_entrees(network, lunch_date, f'school_lunch_buildingId{school_number}')
+        else:
+            menu = get_top_quote(network)
+        # menu = ['blah', 'blah']
+        ding(magtag, school_color, 3)
 
-    voltage = magtag.peripherals.battery
-    voltage = magtag.peripherals.battery
-    update_display(current_time, wake_time, queue, menu, school_number, voltage)
-    ding(magtag, school_color, 4, boodeep)
+        voltage = magtag.peripherals.battery
+        voltage = magtag.peripherals.battery
+        lunch_date = lunch_time[:10]
+        weekday = weekday_text[datetime.fromisoformat(lunch_time).weekday()]
+        update_display(current_time, wake_time, lunch_date, weekday, queue, menu, school_number, voltage)
+        scroll = ding(magtag, school_color, 4, boodeep, checking_school)
+        if scroll == 0:
+            break
 
     # Deinitialize pins and set wakeup alarms
     tuck_in(magtag)
-    pin_alarm_mtv = alarm.pin.PinAlarm(pin=board.D15, value=False, pull=True)
-    pin_alarm_br = alarm.pin.PinAlarm(pin=board.D11, value=False, pull=True)
+    pin_alarm_left = alarm.pin.PinAlarm(pin=board.D15, value=False, pull=True)
+    pin_alarm_right = alarm.pin.PinAlarm(pin=board.D11, value=False, pull=True)
 
 
     print(current_time)
     print(wake_time)
     print(sleep_duration)
-    alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm_mtv, pin_alarm_br)
+    alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm_left, pin_alarm_right)
+
