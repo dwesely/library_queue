@@ -146,7 +146,11 @@ def get_entrees(requests, next_date, school):
     except:
        return ['Error: Unable to connect to menu.']
 
-    menu = p.json()  # json.loads(p.text)
+    try:
+        menu = p.json()  # json.loads(p.text)
+    except ValueError:
+       print(p.text)
+       return ['Error: Menu unparseable.']
 
     if 'FamilyMenuSessions' in menu:
         for s in menu['FamilyMenuSessions']:
@@ -310,7 +314,7 @@ def update_display(ct, wt, ld, wd, q, m, sn, v):
     # battery status
     battery = label.Label(
         terminalio.FONT,
-        text='{:.2f}v'.format(v),
+        text='<   {:.2f}v   >   '.format(v),
         color=0x000000,
         background_color=0xFFFFFF,
         padding_top=0,
@@ -457,8 +461,8 @@ if __name__ == '__main__':
     pin_alarm_right = alarm.pin.PinAlarm(pin=board.D11, value=False, pull=True)
 
 
-    print(current_time)
-    print(wake_time)
-    print(sleep_duration)
+    print(f'Current time {current_time}')
+    print(f'Wake at {wake_time}')
+    print(f'Sleep for {sleep_duration} ms')
     alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm_left, pin_alarm_right)
 
