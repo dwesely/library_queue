@@ -164,7 +164,7 @@ def get_entrees(requests, next_date, school):
     ignore_words = {'Bagel', 'SunButter', 'Soybutter', 'Smoothie', 'OPTION:'}
     menu_items = {}
     for daily_menu in menu['Days']:
-        entrees = [e['RecipeName'] for e in daily_menu['RecipeCategories'][0]['Recipes']]
+        entrees = [e['RecipeName'] for e in daily_menu['MenuMeals'][0]['RecipeCategories'][0]['Recipes']]
         filtered_entrees = []
         for e in entrees:
             if len([w for w in e.split(' ') if w in ignore_words]) == 0:
@@ -293,7 +293,7 @@ def update_display(ct, wt, ld, wd, q, m, sn, v):
     )
     school_1.anchor_point = (0.0, 1.0)
     school_1.anchored_position = (0.0, display.height)
-    # main_group.append(school_1)
+    main_group.append(school_1)
 
     # school 2
     school_2 = label.Label(
@@ -308,7 +308,7 @@ def update_display(ct, wt, ld, wd, q, m, sn, v):
     )
     school_2.anchor_point = (2.0, 1.0)
     school_2.anchored_position = (display.width, display.height)
-    # main_group.append(school_2)
+    main_group.append(school_2)
 
 
     # battery status
@@ -457,13 +457,12 @@ if __name__ == '__main__':
 
     # Deinitialize pins and set wakeup alarms
     tuck_in(magtag)
-    #pin_alarm_left = alarm.pin.PinAlarm(pin=board.D15, value=False, pull=True)
-    #pin_alarm_right = alarm.pin.PinAlarm(pin=board.D11, value=False, pull=True)
+    pin_alarm_left = alarm.pin.PinAlarm(pin=board.D15, value=False, pull=True)
+    pin_alarm_right = alarm.pin.PinAlarm(pin=board.D11, value=False, pull=True)
 
 
     print(f'Current time {current_time}')
     print(f'Wake at {wake_time}')
     print(f'Sleep for {sleep_duration} ms')
-    #alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm_left, pin_alarm_right)
-    alarm.exit_and_deep_sleep_until_alarms(time_alarm)
-
+    alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm_left, pin_alarm_right)
+    #alarm.exit_and_deep_sleep_until_alarms(time_alarm)
