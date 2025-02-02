@@ -124,12 +124,13 @@ def get_events(requests, d, rtc, scroll):
             clock_time = rtc.datetime
             clock_datetime = datetime(*clock_time[0:7]) # convert date_struct to datetime
             calendar_datetime = datetime.fromisoformat(calendar_data['meta']['last_static_update'][0:19])
-            if (calendar_datetime < clock_datetime + timedelta(minutes = 15)) or (calendar_datetime > clock_datetime + timedelta(minutes = 15)):
+            location = secrets.get("timezone", None)
+            localtime = calendar_datetime + timezone(location).utcoffset(calendar_datetime)
+            threshold = timedelta(minutes = 15)
+            if (localtime < clock_datetime - threshold) or (localtime > clock_datetime + threshold):
                 # menu update time is very far from current time, update the clock module
                 ding(magtag, RED, 3) # indicate the clock is being set
-                # time.sleep(10)
-                location = secrets.get("timezone", None)
-                localtime = calendar_datetime + timezone(location).utcoffset(calendar_datetime)
+                # time.sleep(10) # debugging
                 date_struct = [localtime.year, localtime.month, localtime.day, localtime.hour, localtime.minute, localtime.second, 0, -1, -1]
                 rtc.datetime = time.struct_time(date_struct)
 
