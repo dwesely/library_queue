@@ -14,6 +14,8 @@ from adafruit_display_text import label
 from adafruit_bitmap_font import bitmap_font
 from adafruit_magtag.magtag import MagTag
 import json
+from pcf8563 import PCF8563
+from tzdb import timezone
 
 # Buttons
 BTN_ELEM = 0
@@ -60,21 +62,84 @@ def get_latest_queue(requests):
         return -1
 
 
-def get_current_time(requests):
+def get_current_time(requests, rtc):
 
     # Get our username, key and desired timezone
     aio_username = secrets["aio_username"]
     aio_key = secrets["aio_key"]
     location = secrets.get("timezone", None)
-    TIME_URL = "https://io.adafruit.com/api/v2/%s/integrations/time/strftime?x-aio-key=%s&tz=%s" % (aio_username, aio_key, location)
-    TIME_URL += "&fmt=%25Y-%25m-%25dT%25H%3A%25M"
+    fmt = "%Y-%m-%dT%H:%M"
+    clock_time = rtc.datetime
+    clock_datetime = datetime(*clock_time[0:7]) # convert date_struct to datetime
+
+    if clock_time.tm_year < 2025: # module default is 2000-01-01
+        ding(magtag, RED, 2) # indicate we are searching for an updated time
+        TIME_URL = "https://io.adafruit.com/api/v2/%s/integrations/time/strftime?x-aio-key=%s&tz=%s" % (aio_username, aio_key, location)
+        TIME_URL += "&fmt=%25Y-%25m-%25dT%25H%3A%25M"
+        try:
+            response = requests.get(TIME_URL)
+            time_text = response.text
+            response.close()
+
+            # set the clock module for later
+            date_object = datetime.fromisoformat(time_text)
+            date_struct = [date_object.year, date_object.month, date_object.day, date_object.hour, date_object.minute, date_object.second, 0, -1, -1]
+            rtc.datetime = time.struct_time(date_struct)
+            return time_text
+        except BaseException:
+            return '2000-01-01T11:59'
+
+    ding(magtag, GREEN, 3) # indicate the time has been read from the clock
+    return clock_datetime.isoformat()
+
+
+def get_events(requests, d, rtc, scroll):
+    calendar_url = secrets['calendar_url']
+
+    payload = {'start_date': d,
+               'end_date': d,
+               'id': secrets['calendar_id'],
+               'section_ids': secrets['calendar_section_ids'],
+               'paginate': 'false',
+               'locale': 'en'}
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
+
+    url = '{}?{}'.format(calendar_url, '&'.join(['{}={}'.format(key, payload[key]) for key in payload]))
+
     try:
-        response = requests.get(TIME_URL)
-        time_text = response.text
-        response.close()
-        return time_text
-    except BaseException:
-        return '2000-01-01T11:59'
+        p = requests.get(url)
+    except:
+       return ['Error: Unable to connect to school events.']
+
+    try:
+        calendar_data = p.json()  # json.loads(p.text)
+    except ValueError:
+       print(p.text)
+       return ['Error: Events unparseable.']
+
+    # sync date if needed, only on initial menu load
+    if 'meta' in calendar_data and scroll == 0:
+       if 'last_static_update' in calendar_data['meta']:
+            clock_time = rtc.datetime
+            clock_datetime = datetime(*clock_time[0:7]) # convert date_struct to datetime
+            calendar_datetime = datetime.fromisoformat(calendar_data['meta']['last_static_update'][0:19])
+            if (calendar_datetime < clock_datetime + timedelta(minutes = 15)) or (calendar_datetime > clock_datetime + timedelta(minutes = 15)):
+                # menu update time is very far from current time, update the clock module
+                ding(magtag, RED, 3) # indicate the clock is being set
+                # time.sleep(10)
+                location = secrets.get("timezone", None)
+                localtime = calendar_datetime + timezone(location).utcoffset(calendar_datetime)
+                date_struct = [localtime.year, localtime.month, localtime.day, localtime.hour, localtime.minute, localtime.second, 0, -1, -1]
+                rtc.datetime = time.struct_time(date_struct)
+
+    result = ''
+    if 'events' in calendar_data:
+        # continue grabbing daily events
+        result = ', '.join({event['title'] for event in calendar_data['events'] if 'PTO MEETING' not in event['title'].upper()})
+        if len(result)>29:
+            result = '{}...'.format(result[:26])
+    return result
 
 
 def get_time_to_next_wake(current_time):
@@ -156,21 +221,23 @@ def get_entrees(requests, next_date, school):
         for s in menu['FamilyMenuSessions']:
             if ('Lunch' in s.get('ServingSession', '')):
                 menu = s['MenuPlans'][0]
+                break
         # print(menu['MenuPlanName'])
 
     if 'MenuPlanName' not in menu:
         #return ['No menu, make your own lunch']
         return(get_top_quote(requests))
-    ignore_words = {'Bagel', 'SunButter', 'Soybutter', 'Smoothie', 'OPTION:'}
+    ignore_words = {'Bagel', 'SunButter', 'Soybutter', 'Smoothie', 'OPTION:', 'Salad', 'Parfait', 'Wrap'}
     menu_items = {}
     for daily_menu in menu['Days']:
         entrees = [e['RecipeName'] for e in daily_menu['MenuMeals'][0]['RecipeCategories'][0]['Recipes']]
         filtered_entrees = []
         for e in entrees:
             if len([w for w in e.split(' ') if w in ignore_words]) == 0:
-                filtered_entrees.append(e.replace(' - MS/HS', '').replace('Sandwich', 'SW'))
+                filtered_entrees.append(e.replace(' - MS/HS', '').replace('Sandwich', 'SW').replace('with ', 'w/').replace('arella', '.'))
         # print('{}: {}'.format(daily_menu.get('Date'), filtered_entrees))
         # menu_items[daily_menu.get('Date')] = filtered_entrees
+    del menu
     if len(filtered_entrees) == 0:
         return ['Make your own lunch']
     # wrap menu text
@@ -263,7 +330,7 @@ def update_display(ct, wt, ld, wd, q, m, sn, v):
     # Last update time
     text_area = label.Label(
         terminalio.FONT,
-        text='{}      ->      {}'.format(ct, wt[:16]),
+        text='{}      ->      {}'.format(ct[:16], wt[:16]),
         color=0xFFFFFF,
         background_color=0x666666,
         padding_top=1,
@@ -312,16 +379,29 @@ def update_display(ct, wt, ld, wd, q, m, sn, v):
 
 
     # battery status
-    battery = label.Label(
-        terminalio.FONT,
-        text='{:.2f}v'.format(v),
-        color=0x000000,
-        background_color=0xFFFFFF,
-        padding_top=0,
-        padding_bottom=0,
-        padding_right=3,
-        padding_left=3,
-    )
+    if v > 3.1:
+        battery = label.Label(
+            terminalio.FONT,
+            text='{:.2f}v'.format(v),
+            color=0x000000,
+            background_color=0xFFFFFF,
+            padding_top=0,
+            padding_bottom=0,
+            padding_right=3,
+            padding_left=3,
+        )
+    else:
+        battery = label.Label(
+            terminalio.FONT,
+            text='LOW BATTERY',
+            color=0xFFFFFF,
+            background_color=0x000000,
+            padding_top=0,
+            padding_bottom=0,
+            padding_right=3,
+            padding_left=3,
+        )
+
     battery.anchor_point = (0.5, 1.0)
     battery.anchored_position = (display.width/2, display.height)
     main_group.append(battery)
@@ -408,7 +488,7 @@ if __name__ == '__main__':
     # detect and set which school to display
     # set default then check if alternate button was pressed
     # Elementary Lunch (default)
-    boodeep = True
+    boodeep = False
     school_color = GREEN
     school_number = 0
     if isinstance(alarm.wake_alarm, alarm.pin.PinAlarm):
@@ -422,12 +502,17 @@ if __name__ == '__main__':
             school_number = 1
 
     wake_up(magtag)
+
+    # Set up clock
+    i2c_bus = board.I2C()
+    rtc = PCF8563(i2c_bus)
+
     ding(magtag, school_color, 1)
 
     network = connect_to_wifi()
     ding(magtag, school_color, 2)
     queue = get_latest_queue(network)
-    current_time = get_current_time(network)
+    current_time = get_current_time(network, rtc)
     wake_time, sleep_duration = get_time_to_next_wake(current_time)
 
     time_alarm = alarm.time.TimeAlarm(monotonic_time=sleep_duration)
@@ -441,6 +526,8 @@ if __name__ == '__main__':
                 lunch_time = (datetime.fromisoformat(lunch_time) + timedelta(days=scroll)).isoformat()
             lunch_date = lunch_time[:10]
             menu = get_entrees(network, lunch_date, f'school_lunch_buildingId{school_number}')
+            if menu:
+                menu.append(get_events(network, lunch_time[:10], rtc, scroll))
         else:
             menu = get_top_quote(network)
         # menu = ['blah', 'blah']
@@ -466,3 +553,4 @@ if __name__ == '__main__':
     print(f'Sleep for {sleep_duration} ms')
     alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm_left, pin_alarm_right)
     #alarm.exit_and_deep_sleep_until_alarms(time_alarm)
+
