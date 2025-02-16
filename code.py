@@ -531,6 +531,10 @@ if __name__ == '__main__':
                 menu.append(get_events(network, lunch_time[:10], rtc, scroll))
         else:
             menu = get_top_quote(network)
+            # Audible alert if books are ready or overdue
+            if (' RDY ' in menu) or (' DUE ' in menu):
+                boodeep = True
+
         # menu = ['blah', 'blah']
         ding(magtag, school_color, 3)
 
