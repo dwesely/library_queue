@@ -380,7 +380,7 @@ def update_display(ct, wt, ld, wd, q, m, sn, v):
 
 
     # battery status
-    if v > 3.1:
+    if v > voltage_threshold:
         battery = label.Label(
             terminalio.FONT,
             text='{:.2f}v'.format(v),
@@ -489,7 +489,9 @@ if __name__ == '__main__':
     # detect and set which school to display
     # set default then check if alternate button was pressed
     # Elementary Lunch (default)
-    boodeep = False
+    lowbatt = False # Flag indicating battery is below low threshold
+    voltage_threshold = 3.1 # Minimum voltage before skipping timed wakeup
+    boodeep = False # Audible alert
     school_color = GREEN
     school_number = 0
     if isinstance(alarm.wake_alarm, alarm.pin.PinAlarm):
@@ -540,6 +542,7 @@ if __name__ == '__main__':
 
         voltage = magtag.peripherals.battery
         voltage = magtag.peripherals.battery
+        lowbatt = voltage < voltage_threshold
         lunch_date = lunch_time[:10]
         weekday = weekday_text[datetime.fromisoformat(lunch_time).weekday()]
         update_display(current_time, wake_time, lunch_date, weekday, queue, menu, school_number, voltage)
@@ -556,6 +559,9 @@ if __name__ == '__main__':
     print(f'Current time {current_time}')
     print(f'Wake at {wake_time}')
     print(f'Sleep for {sleep_duration} ms')
-    alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm_left, pin_alarm_right)
+    if lowbatt:
+        alarm.exit_and_deep_sleep_until_alarms(pin_alarm_left, pin_alarm_right)
+    else:
+        alarm.exit_and_deep_sleep_until_alarms(time_alarm, pin_alarm_left, pin_alarm_right)
     #alarm.exit_and_deep_sleep_until_alarms(time_alarm)
 
