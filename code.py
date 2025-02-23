@@ -307,7 +307,9 @@ def update_display(ct, wt, ld, wd, q, m, sn, v):
     main_group.append(another_text)
 
     # Add menu
-    if sn > 0:
+    if len(m) < 1:
+        label_text = '---- {} {} Lunch ---\nNo menu parsed. Try later.'.format(wd, ld)
+    elif sn > 0:
         label_text = '---- {} {} Lunch ---\n{}'.format(wd, ld, "\n".join(m)).rstrip('\n\r\t ')
     else:
         label_text = '------- {} {} ------\n{}'.format(wd, ld, "\n".join(m)).rstrip('\n\r\t ')
@@ -515,6 +517,9 @@ if __name__ == '__main__':
     network = connect_to_wifi()
     ding(magtag, school_color, 2)
     queue = get_latest_queue(network)
+    if (queue == 88):
+        # error code, audible alert
+        boodeep = True
     current_time = get_current_time(network, rtc)
     wake_time, sleep_duration = get_time_to_next_wake(current_time)
 
