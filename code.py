@@ -539,7 +539,7 @@ if __name__ == '__main__':
         else:
             menu = get_top_quote(network)
             # Audible alert if books are ready or overdue
-            if (' RDY ' in menu) or (' DUE ' in menu):
+            if any([' RDY ' in r for r in menu]) or any([' DUE ' in r for r in menu]):
                 boodeep = True
 
         # menu = ['blah', 'blah']
