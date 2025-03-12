@@ -109,14 +109,13 @@ def get_events(requests, d, rtc, scroll):
 
     try:
         p = requests.get(url)
-    except:
-       return ['Error: Unable to connect to school events.']
+    except BaseException as e:
+       return f'Events: {e}'
 
     try:
         calendar_data = p.json()  # json.loads(p.text)
-    except ValueError:
-       print(p.text)
-       return ['Error: Events unparseable.']
+    except ValueError as e:
+       return f'Events: {e}'
 
     # sync date if needed, only on initial menu load
     if 'meta' in calendar_data and scroll == 0:
@@ -353,7 +352,7 @@ def update_display(ct, wt, ld, wd, q, m, sn, v):
     # school 1
     school_1 = label.Label(
         terminalio.FONT,
-        text='Elementary',
+        text='   High   ',
         color=fg_for_school[1],
         background_color=bg_for_school[1],
         padding_top=0,
@@ -535,7 +534,7 @@ if __name__ == '__main__':
             lunch_date = lunch_time[:10]
             menu = get_entrees(network, lunch_date, f'school_lunch_buildingId{school_number}')
             if menu:
-                menu.append(get_events(network, lunch_time[:10], rtc, scroll))
+                menu.append(get_events(network, lunch_date, rtc, scroll))
         else:
             menu = get_top_quote(network)
             # Audible alert if books are ready or overdue
