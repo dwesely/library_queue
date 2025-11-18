@@ -101,7 +101,8 @@ def get_events(requests, d, rtc, scroll):
                'id': secrets['calendar_id'],
                'section_ids': secrets['calendar_section_ids'],
                'paginate': 'false',
-               'locale': 'en'}
+               'locale': 'en',
+               'slug': 'events-brm-loudouncountypsva'}
     headers = {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
 
@@ -142,16 +143,20 @@ def get_events(requests, d, rtc, scroll):
     return result
 
 
-def get_time_to_next_wake(current_time):
+def get_time_to_next_wake(current_time, queue_status = 0):
     ct = datetime.fromisoformat(current_time)
     wt = ct
-    if ct.hour < 12:
-        # this is a morning wake up, wait until the afternoon
-        wt = datetime(ct.year, ct.month, ct.day, 17, 30)
-        # print('It is morning, wake up at %s' % wt.isoformat())
+    if queue_status >= 0:
+        if ct.hour < 12:
+            # this is a morning wake up, wait until the afternoon
+            wt = datetime(ct.year, ct.month, ct.day, 17, 30)
+            # print('It is morning, wake up at %s' % wt.isoformat())
+        else:
+            wt = datetime(ct.year, ct.month, ct.day, 6, 30) + timedelta(days=1)
+            # print('It is afternoon, wake up at %s' % wt.isoformat())
     else:
-        wt = datetime(ct.year, ct.month, ct.day, 6, 30) + timedelta(days=1)
-        # print('It is afternoon, wake up at %s' % wt.isoformat())
+        # There was an error code, connection isn't working, try again in an hour
+        wt = ct + timedelta(hours=1)
 
     diff = (wt - ct).total_seconds()
     # print(ct.isoformat())
@@ -309,6 +314,7 @@ def update_display(ct, wt, ld, wd, q, m, sn, v):
     if len(m) < 1:
         label_text = '---- {} {} Lunch ---\nNo menu parsed. Try later.'.format(wd, ld)
     elif sn > 0:
+        #label_text = '---- {} {} Lunch ---\n{}'.format(wd, ld, str(m))
         label_text = '---- {} {} Lunch ---\n{}'.format(wd, ld, "\n".join(m)).rstrip('\n\r\t ')
     else:
         label_text = '------- {} {} ------\n{}'.format(wd, ld, "\n".join(m)).rstrip('\n\r\t ')
@@ -520,7 +526,7 @@ if __name__ == '__main__':
         # error code, audible alert
         boodeep = True
     current_time = get_current_time(network, rtc)
-    wake_time, sleep_duration = get_time_to_next_wake(current_time)
+    wake_time, sleep_duration = get_time_to_next_wake(current_time, queue)
 
     time_alarm = alarm.time.TimeAlarm(monotonic_time=sleep_duration)
 
