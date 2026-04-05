@@ -23,6 +23,12 @@ BTN_MID = 3
 BTN_PREV = 1
 BTN_NEXT = 2
 
+# tone codes
+class Tones:
+    OVERDUE = 3
+    READY = 2
+    ERROR = 8
+
 weekday_text = {0: 'Mo', 1: 'Tu', 2: 'We', 3: 'Th', 4: 'Fr', 5: 'Sa', 6: 'Su'}
 
 # Get wifi details and more from a secrets.py file
@@ -457,7 +463,7 @@ def tuck_in(device):
     pass
 
 
-def ding(device, color, blinks, audible=False, wait_for_button=False):
+def ding(device, color, blinks, audible=0, wait_for_button=False):
     def sweepright():
         for p in range(0, blinks):
             if p < blinks - 1:
@@ -481,10 +487,24 @@ def ding(device, color, blinks, audible=False, wait_for_button=False):
                 elif device.peripherals.button_a_pressed:
                     return 0
         return 0
-    if audible:
+    if audible>0:
         d = 0.15
-        device.peripherals.play_tone(440, d)
-        device.peripherals.play_tone(880, d)
+        if audible == Tones.OVERDUE:
+            # Uh oh
+            device.peripherals.play_tone(660, d)
+            time.sleep(d)
+            device.peripherals.play_tone(440, d*5)
+        elif audible == Tones.READY:
+            # boodeep
+            device.peripherals.play_tone(440, d*5)
+            device.peripherals.play_tone(880, d)
+        elif audible == Tones.ERROR:
+            # error
+            device.peripherals.play_tone(417, d*5)
+            time.sleep(d*5)
+            device.peripherals.play_tone(417, d*5)
+
+        
     pressed = sweepright()
     return pressed
 
@@ -524,7 +544,7 @@ if __name__ == '__main__':
     queue = get_latest_queue(network)
     if (queue == 88):
         # error code, audible alert
-        boodeep = True
+        boodeep = Tones.ERROR
     current_time = get_current_time(network, rtc)
     wake_time, sleep_duration = get_time_to_next_wake(current_time, queue)
 
@@ -544,8 +564,11 @@ if __name__ == '__main__':
         else:
             menu = get_top_quote(network)
             # Audible alert if books are ready or overdue
-            if any([' RDY ' in r for r in menu]) or any([' DUE ' in r for r in menu]):
-                boodeep = True
+            if any([' DUE ' in r for r in menu]):
+                boodeep = Tones.OVERDUE
+            elif any([' RDY ' in r for r in menu]):
+                boodeep = Tones.READY
+                
 
         # menu = ['blah', 'blah']
         ding(magtag, school_color, 3)
