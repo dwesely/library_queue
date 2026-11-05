@@ -14,8 +14,9 @@ from adafruit_display_text import label
 from adafruit_bitmap_font import bitmap_font
 from adafruit_magtag.magtag import MagTag
 import json
-from pcf8563 import PCF8563
+from adafruit_pcf8563.pcf8563 import PCF8563
 from tzdb import timezone
+import zlib
 
 # Buttons
 BTN_ELEM = 0
@@ -110,12 +111,17 @@ def get_events(requests, d, rtc, scroll):
                'locale': 'en',
                'slug': 'events-brm-loudouncountypsva'}
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'deflate',
+            'Connection': 'keep-alive',
+    }
 
     url = '{}?{}'.format(calendar_url, '&'.join(['{}={}'.format(key, payload[key]) for key in payload]))
 
     try:
-        p = requests.get(url)
+        p = requests.get(url, headers=headers)
     except BaseException as e:
        return f'Events: {e}'
 
@@ -214,41 +220,81 @@ def get_entrees(requests, next_date, school):
         "startDate": next_date,
         "endDate": next_date
     }
-
+    headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36',
+            'Accept': 'text/html,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'deflate, identity',
+            'Connection': 'keep-alive',
+    }
     url = '{}?{}'.format(menu_base_url, '&'.join(['{}={}'.format(key, payload[key]) for key in payload]))
 
-    try:
-        p = requests.get(url)
-    except:
-       return ['Error: Unable to connect to menu.']
+    buffer = ''
+    current_meal = ''
+    current_menu = ''
+    text_content = ''
+    recipe = ''
+    lunch_found = False
+    filtered_entrees = []
+    # ignore_words = {'Bagel', 'SunButter', 'Soybutter', 'Smoothie', 'Salad', 'Parfait', }
+    ignore_words = {}
 
     try:
-        menu = p.json()  # json.loads(p.text)
-    except ValueError:
-       print(p.text)
-       return ['Error: Menu unparseable.']
+        p = requests.get(url, headers=headers)
+    except Exception as e:
+       return [f'Error: Unable to connect to menu.\n{e}']
+       
+    try:
+        # Read the network stream in tiny 32-byte chunks
+        for chunk in p.iter_content(chunk_size=32):
+            # Convert bytes to string and append to our processing buffer
+            buffer += chunk.decode('utf-8')
 
-    if 'FamilyMenuSessions' in menu:
-        for s in menu['FamilyMenuSessions']:
-            if ('Lunch' in s.get('ServingSession', '')):
-                menu = s['MenuPlans'][0]
-                break
-        # print(menu['MenuPlanName'])
+            # Process the buffer as long as we can find matching brackets
+            while not lunch_found:
+                if "<" in buffer and ">" in buffer:
+                    start = buffer.find("<")
+                    end = buffer.find(">")
 
-    if 'MenuPlanName' not in menu:
-        #return ['No menu, make your own lunch']
-        return(get_top_quote(requests))
-    ignore_words = {'Bagel', 'SunButter', 'Soybutter', 'Smoothie', 'OPTION:', 'Salad', 'Parfait', 'Wrap'}
-    menu_items = {}
-    for daily_menu in menu['Days']:
-        entrees = [e['RecipeName'] for e in daily_menu['MenuMeals'][0]['RecipeCategories'][0]['Recipes']]
-        filtered_entrees = []
-        for e in entrees:
-            if len([w for w in e.split(' ') if w in ignore_words]) == 0:
-                filtered_entrees.append(e.replace(' - MS/HS', '').replace('Sandwich', 'SW').replace('with ', 'w/').replace('arella', '.'))
-        # print('{}: {}'.format(daily_menu.get('Date'), filtered_entrees))
-        # menu_items[daily_menu.get('Date')] = filtered_entrees
-    del menu
+                    # If a closing bracket appears before an opening bracket,
+                    # it's text content between tags.
+                    if end < start:
+                        text_content = buffer[:end].strip()
+                        # if text_content:
+                        #     print(f"Content: {text_content}")
+                        buffer = buffer[end + 1:]
+                        continue
+
+                    # Extract the full XML tag
+                    tag = buffer[start: end + 1]
+                    # print(f"Tag found: {tag}")
+
+                    if tag == '</MenuMealName>':
+                        current_meal = buffer[:start].strip()
+                        # print(f"Meal found: {current_meal}")
+                        if filtered_entrees and (current_meal == 'Grab &amp; Go Kits'):
+                            # lunch is already found, skip sunbutter sammies
+                            lunch_found = True
+                            break
+                    elif tag == '</MenuPlanName>':
+                        current_menu = buffer[:start].strip()
+                        # print(f"Menu found: {current_menu}")
+                    elif ('Lunch' in current_menu) and tag == '</RecipeName>':
+                        recipe = buffer[:start].strip().replace('&amp;', '&')
+                        # print(f"Recipe found: {recipe}")
+                        if len([w for w in recipe.split(' ') if w in ignore_words]) == 0:
+                            filtered_entrees.append(recipe)
+
+                    # Discard the processed tag from the buffer
+                    buffer = buffer[end + 1:]
+                else:
+                    # Break out of the inner loop if we don't have a complete tag yet
+                    break
+        # print(filtered_entrees)
+    except Exception as e:
+       return [f'Error: Unable to parse menu.\n{e}']
+    
+
     if len(filtered_entrees) == 0:
         return ['Make your own lunch']
     # wrap menu text
@@ -316,7 +362,14 @@ def update_display(ct, wt, ld, wd, q, m, sn, v):
     another_text.anchored_position = (0, (display.height // 2) + 10)
     main_group.append(another_text)
 
-    # Add menu
+    ## Add menu
+    # Break up long strings - needed for error messages
+    chunk_size = 29
+    m = [
+        string[i : i + chunk_size]
+        for string in m
+        for i in range(0, len(string), chunk_size)
+    ]
     if len(m) < 1:
         label_text = '---- {} {} Lunch ---\nNo menu parsed. Try later.'.format(wd, ld)
     elif sn > 0:
@@ -421,7 +474,7 @@ def update_display(ct, wt, ld, wd, q, m, sn, v):
     main_group.append(battery)
 
     # show the main group and refresh.
-    display.show(main_group)
+    display.root_group = main_group
     display.refresh()
     time.sleep(2)
 
@@ -504,7 +557,7 @@ def ding(device, color, blinks, audible=0, wait_for_button=False):
             time.sleep(d*5)
             device.peripherals.play_tone(417, d*5)
 
-        
+
     pressed = sweepright()
     return pressed
 
@@ -557,8 +610,9 @@ if __name__ == '__main__':
         if checking_school:
             if scroll != 0:
                 lunch_time = (datetime.fromisoformat(lunch_time) + timedelta(days=scroll)).isoformat()
-            lunch_date = lunch_time[:10]
-            menu = get_entrees(network, lunch_date, f'school_lunch_buildingId{school_number}')
+            lunch_date = datetime.fromisoformat(lunch_time[:10])
+            menu_date =  f"{lunch_date.month:01}-{lunch_date.day:01}-{lunch_date.year}"
+            menu = get_entrees(network, menu_date, f'school_lunch_buildingId{school_number}')
             if menu:
                 menu.append(get_events(network, lunch_date, rtc, scroll))
         else:
@@ -568,7 +622,7 @@ if __name__ == '__main__':
                 boodeep = Tones.OVERDUE
             elif any([' RDY ' in r for r in menu]):
                 boodeep = Tones.READY
-                
+
 
         # menu = ['blah', 'blah']
         ding(magtag, school_color, 3)
