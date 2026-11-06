@@ -17,6 +17,7 @@ import json
 from adafruit_pcf8563.pcf8563 import PCF8563
 from tzdb import timezone
 import zlib
+import re
 
 # Buttons
 BTN_ELEM = 0
@@ -245,52 +246,32 @@ def get_entrees(requests, next_date, school):
        return [f'Error: Unable to connect to menu.\n{e}']
        
     try:
-        # Read the network stream in tiny 32-byte chunks
-        for chunk in p.iter_content(chunk_size=32):
-            # Convert bytes to string and append to our processing buffer
-            buffer += chunk.decode('utf-8')
+        
+        start = p.text.find('Lunch')
+        end = p.text.find('Go Kits')
+        truncated = p.text[start:end]
 
-            # Process the buffer as long as we can find matching brackets
-            while not lunch_found:
-                if "<" in buffer and ">" in buffer:
-                    start = buffer.find("<")
-                    end = buffer.find(">")
+        pattern = re.compile(r'<RecipeName>([^<]+)</RecipeName>')
 
-                    # If a closing bracket appears before an opening bracket,
-                    # it's text content between tags.
-                    if end < start:
-                        text_content = buffer[:end].strip()
-                        # if text_content:
-                        #     print(f"Content: {text_content}")
-                        buffer = buffer[end + 1:]
-                        continue
+        matches = []
+        pos = 0
 
-                    # Extract the full XML tag
-                    tag = buffer[start: end + 1]
-                    # print(f"Tag found: {tag}")
+        # Loop through the string until no more matches are found
+        while True:
+            match = pattern.search(truncated, pos)
+            if not match:
+                break
 
-                    if tag == '</MenuMealName>':
-                        current_meal = buffer[:start].strip()
-                        # print(f"Meal found: {current_meal}")
-                        if filtered_entrees and (current_meal == 'Grab &amp; Go Kits'):
-                            # lunch is already found, skip sunbutter sammies
-                            lunch_found = True
-                            break
-                    elif tag == '</MenuPlanName>':
-                        current_menu = buffer[:start].strip()
-                        # print(f"Menu found: {current_menu}")
-                    elif ('Lunch' in current_menu) and tag == '</RecipeName>':
-                        recipe = buffer[:start].strip().replace('&amp;', '&')
-                        # print(f"Recipe found: {recipe}")
-                        if len([w for w in recipe.split(' ') if w in ignore_words]) == 0:
-                            filtered_entrees.append(recipe)
+            # Extract the matched text and save it
+            #if len([w for w in match.group(1).replace('&amp;', '&').split(' ') if w in ignore_words]) == 0:
+            matches.append(match.group(1))
 
-                    # Discard the processed tag from the buffer
-                    buffer = buffer[end + 1:]
-                else:
-                    # Break out of the inner loop if we don't have a complete tag yet
-                    break
-        # print(filtered_entrees)
+            # Move the position forward past the end of the current match
+            pos = match.end()
+            
+        # print(matches)
+        return matches
+        
     except Exception as e:
        return [f'Error: Unable to parse menu.\n{e}']
     
