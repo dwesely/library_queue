@@ -1,4 +1,3 @@
-import neopixel
 import alarm
 import ipaddress
 import ssl
@@ -71,6 +70,8 @@ def get_latest_queue(requests):
 
 
 def get_current_time(requests, rtc):
+    # Use the real time clock unless the clock has reverted to default
+    # If the time is invalid, check a time server for current time and update the clock
 
     # Get our username, key and desired timezone
     aio_username = secrets["aio_username"]
@@ -244,9 +245,9 @@ def get_entrees(requests, next_date, school):
         p = requests.get(url, headers=headers)
     except Exception as e:
        return [f'Error: Unable to connect to menu.\n{e}']
-       
+
     try:
-        
+
         start = p.text.find('Lunch')
         end = p.text.find('Go Kits')
         truncated = p.text[start:end]
@@ -268,13 +269,13 @@ def get_entrees(requests, next_date, school):
 
             # Move the position forward past the end of the current match
             pos = match.end()
-            
+
         # print(matches)
         return matches
-        
+
     except Exception as e:
        return [f'Error: Unable to parse menu.\n{e}']
-    
+
 
     if len(filtered_entrees) == 0:
         return ['Make your own lunch']
@@ -476,6 +477,7 @@ def wake_up(device):
     '''
     device.peripherals.neopixel_disable = False
 
+
     # No brightness control, it actually draws more power than running default brightness:
     # https://learn.adafruit.com/circuitpython-essentials/circuitpython-neopixel
     # "You can drive 300 NeoPixel LEDs with brightness control
@@ -493,11 +495,13 @@ def wake_up(device):
 def tuck_in(device):
     device.peripherals.buttons[BTN_ELEM].deinit()
     device.peripherals.buttons[BTN_MID].deinit()
-    device.peripherals.neopixel_disable = True
+    # device.peripherals.neopixel_disable = True
+    device.peripherals.neopixels.deinit()
     pass
 
 
 def ding(device, color, blinks, audible=0, wait_for_button=False):
+
     def sweepright():
         for p in range(0, blinks):
             if p < blinks - 1:
@@ -555,6 +559,18 @@ if __name__ == '__main__':
     boodeep = False # Audible alert
     school_color = GREEN
     school_number = 0
+    queue = 0
+    
+    wake_up(magtag)
+
+    # Set up clock
+    i2c_bus = board.I2C()
+    rtc = PCF8563(i2c_bus)
+    
+    ding(magtag, school_color, 1)
+
+    network = connect_to_wifi()
+    
     if isinstance(alarm.wake_alarm, alarm.pin.PinAlarm):
         boodeep = False
         if repr(alarm.wake_alarm.pin) == 'board.BUTTON_D':
@@ -564,21 +580,15 @@ if __name__ == '__main__':
         else:
             school_color = LAVENDER
             school_number = 1
+    else:
+        queue = get_latest_queue(network)
+        if (queue == 88):
+            # error code, audible alert
+            boodeep = Tones.ERROR
+        
 
-    wake_up(magtag)
 
-    # Set up clock
-    i2c_bus = board.I2C()
-    rtc = PCF8563(i2c_bus)
-
-    ding(magtag, school_color, 1)
-
-    network = connect_to_wifi()
     ding(magtag, school_color, 2)
-    queue = get_latest_queue(network)
-    if (queue == 88):
-        # error code, audible alert
-        boodeep = Tones.ERROR
     current_time = get_current_time(network, rtc)
     wake_time, sleep_duration = get_time_to_next_wake(current_time, queue)
 
@@ -594,8 +604,9 @@ if __name__ == '__main__':
             lunch_date = datetime.fromisoformat(lunch_time[:10])
             menu_date =  f"{lunch_date.month:01}-{lunch_date.day:01}-{lunch_date.year}"
             menu = get_entrees(network, menu_date, f'school_lunch_buildingId{school_number}')
-            if menu:
-                menu.append(get_events(network, lunch_date, rtc, scroll))
+            # Disabled events check here to speed up the display update
+            # if menu:
+            #     menu.append(get_events(network, lunch_date, rtc, scroll))
         else:
             menu = get_top_quote(network)
             # Audible alert if books are ready or overdue
@@ -603,6 +614,10 @@ if __name__ == '__main__':
                 boodeep = Tones.OVERDUE
             elif any([' RDY ' in r for r in menu]):
                 boodeep = Tones.READY
+            
+            # trigger the events check to update the clock
+            lunch_date = datetime.fromisoformat(lunch_time[:10])
+            get_events(network, lunch_date, rtc, scroll)
 
 
         # menu = ['blah', 'blah']
@@ -614,6 +629,7 @@ if __name__ == '__main__':
         lunch_date = lunch_time[:10]
         weekday = weekday_text[datetime.fromisoformat(lunch_time).weekday()]
         update_display(current_time, wake_time, lunch_date, weekday, queue, menu, school_number, voltage)
+        
         scroll = ding(magtag, school_color, 4, boodeep, checking_school)
         if scroll == 0:
             break
